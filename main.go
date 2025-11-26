@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp" // NEW
 )
 
 func homePage(w http.ResponseWriter, r *http.Request) {
@@ -26,13 +28,19 @@ func contactPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	mux := http.NewServeMux()
 
-	http.HandleFunc("/home", homePage)
-	http.HandleFunc("/courses", coursePage)
-	http.HandleFunc("/about", aboutPage)
-	http.HandleFunc("/contact", contactPage)
+	mux.HandleFunc("/home", homePage)
+	mux.HandleFunc("/courses", coursePage)
+	mux.HandleFunc("/about", aboutPage)
+	mux.HandleFunc("/contact", contactPage)
 
-	err := http.ListenAndServe("0.0.0.0:8080", nil)
+
+	http.Handle("/metrics", promhttp.Handler()) // NEW
+	mux.Handle("/metrics", ExposePrometheusHandler())
+	instrumented := Instrument(mux)
+
+	err := http.ListenAndServe("0.0.0.0:9090", instrumented)
 	if err != nil {
 		log.Fatal(err)
 	}
