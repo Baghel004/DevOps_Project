@@ -1,0 +1,53 @@
+name : Deploy to kubernetes
+on : 
+push:
+  branches:
+    - "Complete-CI/CD-with-Terraform-GKE"
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+        - uses: 'actions/checkout@v3'
+        - id: 'auth'
+          name: 'Authenticate to GCP'
+          uses: 'google-github-actions/auth@v1'
+          with:
+            token_format: 'access_token'
+            workload_identity_provider: 'projects/1041615794144/locations/global/workloadIdentityPools/k8s-pool/providers/k8s-provider'
+            service_account: 'devops@devops-479420.iam.gserviceaccount.com'
+        - uses: 'google-github-actions/setup-gcloud@v1'
+        - name: Docker auth
+          run: gcloud auth configure-docker
+        - name: Build and Push Docker Image
+          run: |
+            docker build -t us.gcr.io/devops-479420/goappimage:$IMAGE_TAG .
+            docker push us.gcr.io/devops-479420/goappimage:$IMAGE_TAG
+            working-directory: ./
+        - uses: hashicorp/setup-terraform@v2
+        - name: 'Terraform Init'
+          run: |
+            terraform init \
+              -backend-config="prefix=k8s"
+              working-directory: ./terraform
+        - name: Terraform Plan
+          run: |
+            terraform plan \
+            -var="project_id=$GCP_PROJECT_ID" \
+            -var="container_image=us.gcr.io/devops-479420/goappimage:$IMAGE_TAG" \
+            -var="region=us-central1" \
+            -out=Plan
+          working-directory: ./terraform
+        - name: Terraform Apply
+          run: terraform apply Plan
+          working-directory: ./terraform
+
+            
