@@ -24,17 +24,18 @@ pipeline {
     }
 
     stage('SonarQube Analysis') {
-      steps {
+    steps {
         withSonarQubeEnv('SonarQube') {
-          bat """
-            sonar-scanner ^
+            bat """
+            %SONAR_SCANNER_HOME%\\bin\\sonar-scanner ^
               -Dsonar.projectKey=DevOps_Project ^
               -Dsonar.sources=. ^
               -Dsonar.host.url=%SONAR_HOST_URL% ^
               -Dsonar.login=%SONAR_TOKEN%
-          """
+            """
         }
-      }
     }
+}
+
   }
 }
