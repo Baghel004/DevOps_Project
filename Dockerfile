@@ -1,23 +1,20 @@
 # syntax=docker/dockerfile:1.4
-FROM golang:1.22.5 AS build
+FROM golang:1.23-bullseye AS build
 WORKDIR /app
 
-# recommended envs
 ENV CGO_ENABLED=0 \
     GO111MODULE=on \
     GOPROXY=https://proxy.golang.org,direct \
     GOSUMDB=sum.golang.org
 
-# copy module files first for layer caching
+# copy module files first for caching
 COPY go.mod go.sum ./
 
-# show env and download modules verbosely (helps to debug failures)
+# download modules (verbose for debugging)
 RUN go env && go mod download -x
 
-# copy rest of sources
+# copy source and build
 COPY . .
-
-# build static binary
 RUN GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o /app/main .
 
 FROM gcr.io/distroless/base-debian11
