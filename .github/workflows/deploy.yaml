@@ -59,28 +59,24 @@ jobs:
         working-directory: ./terraform
         run: terraform apply -auto-approve tfplan
 
-      - name: Export Terraform outputs to env
+      - name: Export Terraform outputs to env (no-python, uses jq)
         working-directory: ./terraform
         run: |
+          # ensure jq is available
+          apt-get update -y
+          apt-get install -y jq
+
+          # capture outputs (safe if no outputs present)
           outputs=$(terraform output -json 2>/dev/null || echo "{}")
           echo "$outputs" > tf_outputs.json
 
-          CLUSTER_NAME=$(python3 - <<'PY'
-import json
-j = json.load(open('tf_outputs.json'))
-v = j.get('cluster_name')
-print(v.get('value', '') if isinstance(v, dict) else '')
-PY
-)
+          # extract cluster name (terraform outputs are objects like { "value": ... })
+          CLUSTER_NAME=$(jq -r '.cluster_name.value // empty' tf_outputs.json || true)
 
-          CLUSTER_LOCATION=$(python3 - <<'PY'
-import json
-j = json.load(open('tf_outputs.json'))
-v = j.get('cluster_location') or j.get('cluster_zone') or j.get('cluster_region')
-print(v.get('value', '') if isinstance(v, dict) else '')
-PY
-)
+          # extract cluster location: try cluster_location, then cluster_zone, then cluster_region
+          CLUSTER_LOCATION=$(jq -r '(.cluster_location.value // .cluster_zone.value // .cluster_region.value) // empty' tf_outputs.json || true)
 
+          # Export to GITHUB_ENV so subsequent steps can use them
           echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
           echo "CLUSTER_LOCATION=$CLUSTER_LOCATION" >> $GITHUB_ENV
 
